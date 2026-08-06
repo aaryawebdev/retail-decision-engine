@@ -1,0 +1,381 @@
+.top-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border, #ddd);
+}
+
+.top-nav nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.nav-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.nav-group-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #888;
+  margin-right: 2px;
+}
+
+.nav-divider {
+  width: 1px;
+  height: 20px;
+  background: #ddd;
+  margin: 0 8px;
+}
+
+.nav-link {
+  text-decoration: none;
+  color: inherit;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.nav-link.active {
+  background: rgba(127, 127, 127, 0.15);
+  font-weight: 600;
+}
+
+.acting-user-picker {
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+main {
+  padding: 24px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+main:has(.page-wide) {
+  max-width: 1200px;
+}
+
+.page-subtitle {
+  color: #666;
+  margin-top: -8px;
+  margin-bottom: 24px;
+}
+
+.entry-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 480px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field label {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.field select,
+.field input,
+.field textarea {
+  padding: 8px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.field-checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.char-count {
+  font-size: 12px;
+  color: #888;
+  align-self: flex-end;
+}
+
+.field-hint {
+  font-size: 12px;
+  color: #888;
+  font-style: italic;
+}
+
+.status-error {
+  color: #b00020;
+  background: rgba(176, 0, 32, 0.08);
+  padding: 10px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.status-success {
+  color: #0a7a2f;
+  background: rgba(10, 122, 47, 0.08);
+  padding: 10px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+button {
+  align-self: flex-start;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: none;
+  background: #1a1a2e;
+  color: #fff;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.placeholder-page {
+  color: #666;
+}
+
+.file-name {
+  font-size: 13px;
+  color: #666;
+}
+
+.mapping-table,
+.preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0 24px;
+  font-size: 13px;
+}
+
+.mapping-table th,
+.mapping-table td,
+.preview-table th,
+.preview-table td {
+  border: 1px solid #ddd;
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.preview-table tr.row-invalid {
+  background: rgba(176, 0, 32, 0.12);
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge-grey {
+  background: rgba(127, 127, 127, 0.2);
+  color: #555;
+}
+
+.badge-amber {
+  background: rgba(230, 160, 20, 0.18);
+  color: #8a5a00;
+}
+
+.badge-green {
+  background: rgba(10, 122, 47, 0.15);
+  color: #0a7a2f;
+}
+
+.radio-group {
+  display: flex;
+  gap: 16px;
+  font-weight: normal;
+  font-size: 14px;
+}
+
+.radio-group label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: normal;
+}
+
+.filter-bar {
+  display: flex;
+  gap: 24px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.toggle-group {
+  display: flex;
+  gap: 4px;
+}
+
+.toggle-btn {
+  align-self: auto;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background: transparent;
+  color: inherit;
+}
+
+.toggle-btn.active {
+  background: #1a1a2e;
+  color: #fff;
+  border-color: #1a1a2e;
+}
+
+.kpi-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.kpi-card {
+  position: relative;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: rgba(127, 127, 127, 0.05);
+}
+
+.lag-kpi-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #888;
+  background: rgba(127, 127, 127, 0.14);
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.kpi-card-green {
+  border-color: rgba(10, 122, 47, 0.4);
+  background: rgba(10, 122, 47, 0.06);
+}
+
+.kpi-card-red {
+  border-color: rgba(176, 0, 32, 0.4);
+  background: rgba(176, 0, 32, 0.06);
+}
+
+.kpi-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 4px;
+}
+
+.kpi-card-value {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.kpi-card-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #666;
+  padding: 2px 0;
+}
+
+.table-note {
+  font-size: 13px;
+  color: #666;
+  margin-top: -12px;
+}
+
+.trend-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.trend-chart-card {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.trend-chart-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 4px;
+}
+
+.attribution-note {
+  font-size: 13px;
+  color: #555;
+  background: rgba(230, 160, 20, 0.1);
+  border: 1px solid rgba(230, 160, 20, 0.3);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.threshold-field {
+  max-width: 320px;
+  margin-bottom: 16px;
+}
+
+.threshold-field .field-hint {
+  white-space: normal;
+}
+
+.alert-row {
+  cursor: pointer;
+}
+
+.alert-row:hover {
+  background: rgba(127, 127, 127, 0.1);
+}
+
+.row-selected {
+  background: rgba(26, 26, 46, 0.08);
+  font-weight: 600;
+}
+
+.finding-note {
+  width: 100%;
+  max-width: 640px;
+  padding: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
