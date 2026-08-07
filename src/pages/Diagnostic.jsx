@@ -301,7 +301,7 @@ export default function Diagnostic() {
                       type="monotone"
                       dataKey="kpiValue"
                       name={KPI_META[selectedAlert.kpi]?.name}
-                      stroke="#1a1a2e"
+                      stroke="#FF2E8B"
                       strokeWidth={2}
                       dot={{ r: 3 }}
                       connectNulls={false}
@@ -311,7 +311,7 @@ export default function Diagnostic() {
                       type="monotone"
                       dataKey="relevantSpend"
                       name="INV-01/02/03 Spend"
-                      stroke="#c0392b"
+                      stroke="#7B4FA8"
                       strokeWidth={2}
                       dot={{ r: 3 }}
                     />

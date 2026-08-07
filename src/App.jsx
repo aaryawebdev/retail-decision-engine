@@ -52,7 +52,10 @@ function TopNav() {
           </div>
         ))}
       </nav>
-      <ActingUserPicker />
+      <div className="top-nav-right">
+        <img src="/nykaa-seeklogo.svg" alt="Nykaa" className="nykaa-logo" />
+        <ActingUserPicker />
+      </div>
     </header>
   );
 }

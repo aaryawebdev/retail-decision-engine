@@ -377,7 +377,7 @@ export default function Leadership() {
                   <XAxis dataKey="quarter" tick={{ fontSize: 10 }} />
                   <YAxis hide />
                   <Tooltip formatter={(v) => formatValue(v, m.format)} />
-                  <Line type="monotone" dataKey="value" stroke="#1a1a2e" dot={false} strokeWidth={2} />
+                  <Line type="monotone" dataKey="value" stroke="#FF2E8B" dot={false} strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
