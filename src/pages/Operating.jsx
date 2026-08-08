@@ -305,6 +305,93 @@ export default function Operating() {
     };
   }, [boundaries, verticalId, quarterIdx, channelId, locationId]);
 
+  // Operating Summary — plain-English read of the operational KPIs already
+  // computed above (cacByChannel, brandVsPerformance, retentionTrend,
+  // candidates). No new calculations; just picks out the most useful
+  // findings for whatever vertical/quarter/channel/location/groupBy is
+  // currently selected.
+  const operatingSummary = useMemo(() => {
+    if (!verticalId || microLoading || loading) return null;
+    const lines = [];
+
+    if (brandVsPerformance) {
+      const { performanceRatio, brandRatio } = brandVsPerformance;
+      if (performanceRatio !== null && brandRatio !== null) {
+        if (brandRatio > performanceRatio) {
+          lines.push(
+            `Brand Marketing is currently more efficient than Performance Marketing (${brandRatio.toFixed(
+              2
+            )}× vs ${performanceRatio.toFixed(2)}×).`
+          );
+        } else if (performanceRatio > brandRatio) {
+          lines.push(
+            `Performance Marketing is currently more efficient than Brand Marketing (${performanceRatio.toFixed(
+              2
+            )}× vs ${brandRatio.toFixed(2)}×).`
+          );
+        } else {
+          lines.push('Brand Marketing and Performance Marketing are running at about the same efficiency.');
+        }
+      } else if (performanceRatio !== null && brandRatio === null) {
+        lines.push('Only Performance Marketing has recorded spend for this selection — no Brand Marketing spend to compare.');
+      } else if (brandRatio !== null && performanceRatio === null) {
+        lines.push('Only Brand Marketing has recorded spend for this selection — no Performance Marketing spend to compare.');
+      }
+    }
+
+    if (cacByChannel.length > 0) {
+      const withCac = cacByChannel.filter((r) => r.cac !== null);
+      const withoutCac = cacByChannel.filter((r) => r.cac === null && r.spend > 0);
+      if (withCac.length > 0) {
+        const cheapest = withCac.slice().sort((a, b) => a.cac - b.cac)[0];
+        const costliest = withCac.slice().sort((a, b) => b.cac - a.cac)[0];
+        const cheapName = channelNames[cheapest.channelId] ?? cheapest.channelId;
+        if (withCac.length > 1 && cheapest.channelId !== costliest.channelId) {
+          const costName = channelNames[costliest.channelId] ?? costliest.channelId;
+          lines.push(
+            `${cheapName} has the lowest cost per new customer (${formatInr(cheapest.cac)}), while ${costName} has the highest (${formatInr(
+              costliest.cac
+            )}).`
+          );
+        } else {
+          lines.push(`${cheapName} has a measurable cost per new customer of ${formatInr(cheapest.cac)}.`);
+        }
+      }
+      if (withoutCac.length > 0) {
+        const names = withoutCac.map((r) => channelNames[r.channelId] ?? r.channelId).join(', ');
+        lines.push(`${names} ${withoutCac.length === 1 ? 'has' : 'have'} recorded spend but no new customers yet, so cost per new customer can't be calculated.`);
+      }
+    } else if (channelId || locationId) {
+      lines.push('Not enough data is available for this selection to calculate cost per new customer.');
+    }
+
+    if (candidates.length > 0) {
+      const names = candidates.slice(0, 3).map((c) => c.name).join(', ');
+      lines.push(
+        `${names} ${candidates.length === 1 ? 'is' : 'are'} flagged in Reallocation Candidates for running below the efficiency threshold.`
+      );
+    } else if (!loading && rows.length > 0) {
+      lines.push(`No ${groupBy.toLowerCase()} is currently flagged below the efficiency threshold.`);
+    }
+
+    if (lines.length === 0) {
+      lines.push('Not enough data is available for this selection to summarize operating performance.');
+    }
+    return lines.slice(0, 3);
+  }, [
+    verticalId,
+    microLoading,
+    loading,
+    brandVsPerformance,
+    cacByChannel,
+    channelNames,
+    channelId,
+    locationId,
+    candidates,
+    rows,
+    groupBy,
+  ]);
+
   return (
     <div className="page page-wide">
       <h1>Operating View</h1>
@@ -650,6 +737,18 @@ export default function Operating() {
               </tbody>
             </table>
           )}
+
+          <div className="summary-box">
+            <h2>Operating Summary</h2>
+            {(microLoading || loading) && <p>Loading…</p>}
+            {!microLoading && !loading && operatingSummary && (
+              <ul>
+                {operatingSummary.map((line, i) => (
+                  <li key={i}>{line}</li>
+                ))}
+              </ul>
+            )}
+          </div>
         </>
       )}
     </div>

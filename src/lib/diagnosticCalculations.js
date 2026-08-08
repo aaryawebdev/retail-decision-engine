@@ -110,3 +110,95 @@ export async function getStoreFootfallByDay(locationId, quarter) {
     .order('transaction_date');
   return data || [];
 }
+
+// ---------------------------------------------------------------------
+// Progressive drill-down for a vertical_kpi alert: Vertical (already
+// selected via the alert) -> Channel -> Product Category -> Store
+// (Offline Retail only) -> Time. Each step narrows both fact_investment
+// and fact_return by whatever filters accumulated at the steps above it,
+// and reports on the same two series the alert itself is about — spend
+// (INV-01/02/03, matching the KPI trend chart already shown) and revenue
+// (RET-01.2) — so a person can see where within the vertical a swing is
+// concentrated. There is no campaign dimension anywhere in this schema
+// (no campaign_id, no campaign table, and the notes column is unused seed
+// filler) — Campaign is intentionally not a drill step here, rather than
+// inventing one.
+// ---------------------------------------------------------------------
+
+async function fetchFilteredRows(table, categoryColumn, categoryValues, quarter, filters) {
+  let query = supabase
+    .from(table)
+    .select('*')
+    .gte('transaction_date', quarter.start)
+    .lt('transaction_date', quarter.end);
+  if (categoryValues) query = query.in(categoryColumn, categoryValues);
+  if (filters.verticalId) query = query.eq('vertical_id', filters.verticalId);
+  if (filters.channelId) query = query.eq('channel_id', filters.channelId);
+  if (filters.productCategoryId) query = query.eq('product_category_id', filters.productCategoryId);
+  if (filters.locationId) query = query.eq('location_id', filters.locationId);
+  const { data, error } = await query;
+  if (error) console.error(`fetchFilteredRows failed for ${table}:`, error);
+  return data || [];
+}
+
+const MARKETING_BRANCH_PREFIXES = ['INV-01', 'INV-02', 'INV-03'];
+
+function sumMarketingSpend(rows) {
+  return rows
+    .filter((r) => MARKETING_BRANCH_PREFIXES.some((p) => r.inv_cat_id.startsWith(p)))
+    .reduce((s, r) => s + Number(r.amount_inr), 0);
+}
+
+function sumRevenue(rows) {
+  return rows.filter((r) => r.ret_cat_id === 'RET-01.2').reduce((s, r) => s + Number(r.value), 0);
+}
+
+// One breakdown step: groups spend + revenue by whichever dimension key is
+// requested, within the quarter and whatever filters are already applied
+// from steps above. `dimension` is 'channel_id' | 'product_category_id' |
+// 'location_id'.
+export async function getDrillBreakdown(dimension, quarter, filters) {
+  const [investmentRows, returnRows] = await Promise.all([
+    fetchFilteredRows('fact_investment', null, null, quarter, filters),
+    fetchFilteredRows('fact_return', 'ret_cat_id', ['RET-01.2'], quarter, filters),
+  ]);
+
+  const keys = new Set([
+    ...investmentRows.map((r) => r[dimension]).filter((v) => v !== null && v !== undefined),
+    ...returnRows.map((r) => r[dimension]).filter((v) => v !== null && v !== undefined),
+  ]);
+
+  return [...keys].map((key) => {
+    const invForKey = investmentRows.filter((r) => r[dimension] === key);
+    const retForKey = returnRows.filter((r) => r[dimension] === key);
+    const spend = sumMarketingSpend(invForKey);
+    const revenue = sumRevenue(retForKey);
+    return { key, spend, revenue, ratio: spend > 0 ? revenue / spend : null };
+  });
+}
+
+// Final Time step: day-level spend + revenue for whatever filters have
+// accumulated through Channel/Product Category/Store, within the alert's
+// quarter — the same "pinpoint the exact date" job getStoreFootfallByDay
+// already does for footfall alerts, generalized to any filter combination.
+export async function getDrillByDay(quarter, filters) {
+  const [investmentRows, returnRows] = await Promise.all([
+    fetchFilteredRows('fact_investment', null, null, quarter, filters),
+    fetchFilteredRows('fact_return', 'ret_cat_id', ['RET-01.2'], quarter, filters),
+  ]);
+
+  const byDay = {};
+  investmentRows.forEach((r) => {
+    if (!MARKETING_BRANCH_PREFIXES.some((p) => r.inv_cat_id.startsWith(p))) return;
+    const d = r.transaction_date;
+    byDay[d] = byDay[d] || { date: d, spend: 0, revenue: 0 };
+    byDay[d].spend += Number(r.amount_inr);
+  });
+  returnRows.forEach((r) => {
+    const d = r.transaction_date;
+    byDay[d] = byDay[d] || { date: d, spend: 0, revenue: 0 };
+    byDay[d].revenue += Number(r.value);
+  });
+
+  return Object.values(byDay).sort((a, b) => (a.date < b.date ? -1 : 1));
+}

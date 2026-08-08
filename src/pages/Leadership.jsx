@@ -246,9 +246,69 @@ export default function Leadership() {
       const vsPrevious =
         actual !== null && previousVal !== null ? actual - previousVal : null;
 
-      return { code, name, format, actual, targetValue, idealValue, outcome, vsPrevious, best };
+      return { code, name, format, actual, targetValue, idealValue, outcome, vsPrevious, direction, best };
     });
   }, [cardData, prevData, bestSoFar, targets]);
+
+  // KPI Summary — plain-English read of the same cards data above, not a
+  // separate calculation. Picks the 2-3 most notable findings by target gap
+  // first, then period-over-period swing, respecting each KPI's direction.
+  const kpiSummary = useMemo(() => {
+    if (cardsLoading || cards.length === 0) return null;
+    const withData = cards.filter((c) => c.actual !== null);
+    if (withData.length === 0) return ['Not enough data is available yet for this quarter and vertical.'];
+
+    const pctGap = (c) => {
+      if (c.targetValue === null || c.targetValue === 0) return null;
+      const gap = ((c.actual - c.targetValue) / Math.abs(c.targetValue)) * 100;
+      return c.direction === 'lower_is_better' ? -gap : gap; // positive = beating target either way
+    };
+
+    const scored = withData.map((c) => {
+      const gap = pctGap(c);
+      const swing =
+        c.vsPrevious !== null && c.actual !== 0
+          ? (c.vsPrevious / Math.abs(c.actual - c.vsPrevious || c.actual || 1)) * 100
+          : null;
+      const importance = Math.max(gap !== null ? Math.abs(gap) : 0, swing !== null ? Math.abs(swing) * 0.5 : 0);
+      return { ...c, gap, swing, importance };
+    });
+
+    scored.sort((a, b) => b.importance - a.importance);
+    const top = scored.slice(0, 3).filter((c) => c.gap !== null || c.swing !== null);
+    if (top.length === 0) return ['KPIs are close to target and roughly flat versus last quarter.'];
+
+    return top.map((c) => {
+      const gapOk = c.gap !== null && c.gap >= 0;
+      const gapBad = c.gap !== null && c.gap < 0;
+      const valueStr = formatValue(c.actual, c.format);
+      const targetStr = c.targetValue !== null ? formatValue(c.targetValue, c.format) : null;
+      const actualIsHigher = c.targetValue !== null && c.actual > c.targetValue;
+      const relWord = actualIsHigher ? 'above' : 'below';
+
+      let line;
+      if (gapBad) {
+        line = `${c.name} is ${valueStr}, missing the target of ${targetStr} (${relWord} target).`;
+      } else if (gapOk) {
+        line = `${c.name} is ${valueStr}, meeting the target of ${targetStr}.`;
+      } else {
+        line = `${c.name} is ${valueStr}.`;
+      }
+
+      if (c.vsPrevious !== null && Math.abs(c.swing ?? 0) >= 15) {
+        const dir =
+          c.direction === 'lower_is_better'
+            ? c.vsPrevious < 0
+              ? 'improved'
+              : 'gotten worse'
+            : c.vsPrevious > 0
+            ? 'improved'
+            : 'dropped';
+        line += ` It has ${dir} compared to last quarter (${formatDelta(c.vsPrevious, c.format)}).`;
+      }
+      return line;
+    });
+  }, [cards, cardsLoading]);
 
   return (
     <div className="page page-wide">
@@ -419,6 +479,18 @@ export default function Leadership() {
           </tbody>
         </table>
       )}
+
+      <div className="summary-box">
+        <h2>KPI Summary</h2>
+        {cardsLoading && <p>Loading…</p>}
+        {!cardsLoading && kpiSummary && (
+          <ul>
+            {kpiSummary.map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

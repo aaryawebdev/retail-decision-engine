@@ -67,15 +67,42 @@ export async function calcKPI01_NetRevenueGrowth(quarterLabel, verticalId, bound
   return { value: growthPct, revenueAmount: currentSum };
 }
 
+// Denominator is deliberately restricted to demand-generation spend
+// (Performance + Brand + Content/Influencer marketing) rather than every
+// investment branch — a "Marketing ROI" that divides revenue by store rent,
+// team salaries and martech tooling (INV-04 through INV-09) is not
+// measuring marketing efficiency, and would silently disagree with KPI-04's
+// CAC formula, which already scopes its numerator to the same three
+// branches. Matching that scope here is what keeps the two KPIs consistent
+// with each other.
+async function fetchMarketingInvestmentRows(quarter, verticalId) {
+  let query = supabase
+    .from('fact_investment')
+    .select('*')
+    .gte('transaction_date', quarter.start)
+    .lt('transaction_date', quarter.end)
+    .or('inv_cat_id.like.INV-01%,inv_cat_id.like.INV-02%,inv_cat_id.like.INV-03%');
+  if (verticalId) query = query.eq('vertical_id', verticalId);
+  const { data, error } = await query;
+  if (error) console.error('fetchMarketingInvestmentRows failed:', error);
+  return data || [];
+}
+
 export async function calcKPI02_BlendedROI(quarterLabel, verticalId, boundaries) {
   const q = boundaries.find((b) => b.label === quarterLabel);
   const returns = await fetchRows('fact_return', 'ret_cat_id', ['RET-01.2'], q, verticalId);
-  const investments = await fetchRows('fact_investment', null, null, q, verticalId);
+  const investments = await fetchMarketingInvestmentRows(q, verticalId);
   const totalReturn = returns.reduce((s, r) => s + Number(r.value), 0);
   const totalInvestment = investments.reduce((s, r) => s + Number(r.amount_inr), 0);
   return { value: totalInvestment > 0 ? totalReturn / totalInvestment : 0 };
 }
 
+// A flat average across every matching row already weights each reading
+// equally regardless of which vertical it came from — at group level
+// (verticalId null) that's the same thing as "weighted across verticals"
+// per Stage 3's formula, since a vertical with more transactions
+// contributes proportionally more rows rather than one averaged-down number
+// per vertical.
 export async function calcKPI03_RepeatPurchaseRate(quarterLabel, verticalId, boundaries) {
   const q = boundaries.find((b) => b.label === quarterLabel);
   const rows = await fetchRows('fact_return', 'ret_cat_id', ['RET-03.2'], q, verticalId);

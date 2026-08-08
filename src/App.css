@@ -581,6 +581,44 @@ button:disabled {
   background: var(--surface);
 }
 
+/* ---------- Page-end summary box ---------- */
+
+.summary-box {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--brand);
+  border-radius: var(--radius-md);
+  padding: 18px 20px;
+  margin-top: 32px;
+  margin-bottom: 12px;
+}
+
+.summary-box h2 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 16px;
+}
+
+.summary-box ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.summary-box li {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.6;
+  margin-bottom: 6px;
+}
+
+.summary-box li:last-child {
+  margin-bottom: 0;
+}
+
+.summary-box li strong {
+  color: var(--text-h);
+}
+
 /* ---------- Generic page card wrapper ---------- */
 
 .page h2 {
