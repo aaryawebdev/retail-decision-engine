@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
 import { supabase } from '../lib/supabaseClient';
 import { getQuarterBoundaries } from '../lib/kpiCalculations';
 import {
@@ -8,6 +9,11 @@ import {
   getSpendByBranch,
   getSpendByChannel,
   getSpendByLocation,
+  getCostPerNewCustomerByChannel,
+  getBrandVsPerformanceEfficiency,
+  getRetentionPayback,
+  getBrandEquityTrend,
+  getOfflineConversionEfficiency,
 } from '../lib/operatingCalculations';
 import SupabaseSelect from '../components/SupabaseSelect';
 
@@ -63,6 +69,12 @@ export default function Operating() {
   );
   const [groupBy, setGroupBy] = useState('Branch');
 
+  // Narrowing filters for the Operational KPI section only — the existing
+  // Spend Efficiency table below is unaffected and keeps using Group By as
+  // it always has.
+  const [channelId, setChannelId] = useState('');
+  const [locationId, setLocationId] = useState('');
+
   useEffect(() => {
     if (initialQuarter && QUARTER_LABELS.includes(initialQuarter)) {
       setQuarterLabel(initialQuarter);
@@ -77,6 +89,7 @@ export default function Operating() {
   const [branchNames, setBranchNames] = useState({});
   const [channelNames, setChannelNames] = useState({});
   const [locationLabels, setLocationLabels] = useState({});
+  const [offlineLocationOptions, setOfflineLocationOptions] = useState([]);
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -118,13 +131,17 @@ export default function Operating() {
       });
     supabase
       .from('dim_location')
-      .select('location_id, region, store_name')
+      .select('location_id, region, store_name, is_offline')
       .then(({ data }) => {
         const map = {};
+        const offlineOptions = [];
         (data || []).forEach((r) => {
-          map[r.location_id] = `${r.region} — ${r.store_name || 'Online'}`;
+          const label = `${r.region} — ${r.store_name || 'Online'}`;
+          map[r.location_id] = label;
+          if (r.is_offline) offlineOptions.push([r.location_id, label]);
         });
         setLocationLabels(map);
+        setOfflineLocationOptions(offlineOptions);
       });
   }, []);
 
@@ -152,6 +169,20 @@ export default function Operating() {
       setGroupBy('Branch');
     }
   }, [isOfflineRetail, groupBy]);
+
+  // Same rule for the Location filter itself, plus a full reset any time
+  // the vertical changes — a channel/location picked for one vertical
+  // rarely still applies to another.
+  useEffect(() => {
+    setChannelId('');
+    setLocationId('');
+  }, [verticalId]);
+
+  useEffect(() => {
+    if (locationId && !isOfflineRetail) {
+      setLocationId('');
+    }
+  }, [isOfflineRetail, locationId]);
 
   const quarterIdx = QUARTER_LABELS.indexOf(quarterLabel);
   const prevQuarterLabel = quarterIdx > 0 ? QUARTER_LABELS[quarterIdx - 1] : null;
@@ -230,6 +261,50 @@ export default function Operating() {
     return rows.filter((r) => r.ratio !== null && r.ratio < threshold);
   }, [rows, threshold]);
 
+  // Operational KPIs — sliced versions of the same marketing-efficiency
+  // logic the macro (Leadership) KPIs use, at channel/category/location
+  // level. Recomputed whenever vertical, quarter, channel or location
+  // changes — independent of the Group By toggle, which only drives the
+  // Spend Efficiency table below. Reuses the existing channelNames map
+  // (fetched once above) rather than re-fetching.
+  const [cacByChannel, setCacByChannel] = useState([]);
+  const [brandVsPerformance, setBrandVsPerformance] = useState(null);
+  const [retentionTrend, setRetentionTrend] = useState([]);
+  const [brandEquityTrend, setBrandEquityTrend] = useState([]);
+  const [offlineConversion, setOfflineConversion] = useState(null);
+  const [microLoading, setMicroLoading] = useState(true);
+
+  useEffect(() => {
+    if (boundaries.length === 0 || !verticalId) return;
+    let cancelled = false;
+    setMicroLoading(true);
+
+    (async () => {
+      const quarter = boundaries[quarterIdx];
+      const trailingLabels = QUARTER_LABELS.slice(0, quarterIdx + 1).slice(-4);
+
+      const [cac, brandPerf, retention, brandEquity, offlineConv] = await Promise.all([
+        getCostPerNewCustomerByChannel(verticalId, quarter, channelId, locationId),
+        getBrandVsPerformanceEfficiency(verticalId, quarter, channelId, locationId),
+        getRetentionPayback(verticalId, trailingLabels, boundaries, channelId, locationId),
+        getBrandEquityTrend(verticalId, trailingLabels, boundaries, channelId, locationId),
+        getOfflineConversionEfficiency(verticalId, quarter, locationId),
+      ]);
+
+      if (cancelled) return;
+      setCacByChannel(cac);
+      setOfflineConversion(offlineConv);
+      setBrandVsPerformance(brandPerf);
+      setRetentionTrend(retention);
+      setBrandEquityTrend(brandEquity);
+      setMicroLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [boundaries, verticalId, quarterIdx, channelId, locationId]);
+
   return (
     <div className="page page-wide">
       <h1>Operating View</h1>
@@ -266,6 +341,39 @@ export default function Operating() {
         </div>
 
         <div className="field">
+          <label>Channel</label>
+          <select
+            value={channelId}
+            onChange={(e) => setChannelId(e.target.value)}
+            disabled={!verticalId}
+          >
+            <option value="">All channels</option>
+            {Object.entries(channelNames).map(([id, name]) => (
+              <option key={id} value={id}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="field">
+          <label>Location</label>
+          <select
+            value={locationId}
+            onChange={(e) => setLocationId(e.target.value)}
+            disabled={!verticalId || !isOfflineRetail}
+            title={!isOfflineRetail ? 'Location filtering is only available for Offline Retail' : undefined}
+          >
+            <option value="">All locations</option>
+            {offlineLocationOptions.map(([id, name]) => (
+              <option key={id} value={id}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="field">
           <label>Group By</label>
           <div className="toggle-group">
             {GROUP_BY_OPTIONS.map((opt) => {
@@ -291,6 +399,168 @@ export default function Operating() {
 
       {verticalId && (
         <>
+          <h2>Operational KPIs — {verticalName}, {quarterLabel}</h2>
+          <p className="page-subtitle">
+            Where the waste is, for a Marketing Manager or Vertical Head to act on directly. Each
+            KPI below explains movement in a specific Leadership KPI, and narrows to whatever
+            Channel and Location are selected above.
+          </p>
+          {microLoading && <p>Loading…</p>}
+          {!microLoading && (
+            <>
+              <h3>Cost per New Customer, by Channel</h3>
+              <p className="field-hint">Explains: KPI-04 Blended CAC.</p>
+              {cacByChannel.length === 0 && <p>No performance/brand/content spend or new-customer data for this selection.</p>}
+              {cacByChannel.length > 0 && (
+                <table className="preview-table">
+                  <thead>
+                    <tr>
+                      <th>Channel</th>
+                      <th>Marketing Spend</th>
+                      <th>New Customers</th>
+                      <th>Cost per New Customer</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cacByChannel
+                      .slice()
+                      .sort((a, b) => (a.cac ?? Infinity) - (b.cac ?? Infinity))
+                      .map((r) => (
+                        <tr key={r.channelId}>
+                          <td>{channelNames[r.channelId] ?? r.channelId}</td>
+                          <td>{formatInr(r.spend)}</td>
+                          <td>{r.customers.toLocaleString('en-IN')}</td>
+                          <td>{r.cac !== null ? formatInr(r.cac) : '—'}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              )}
+              <p className="table-note">
+                If Blended CAC on the Leadership screen rose this quarter, the channel with the
+                highest cost here is usually why — lowest cost per new customer is the channel
+                currently earning the next incremental acquisition rupee most efficiently, and a
+                candidate to shift budget toward next quarter.
+              </p>
+
+              <h3>Brand vs. Performance Marketing Efficiency</h3>
+              <p className="field-hint">Explains: KPI-02 Blended Marketing ROI.</p>
+              {brandVsPerformance && (
+                <div className="kpi-card-grid">
+                  <div className="kpi-card">
+                    <div className="kpi-card-name">Performance Marketing (INV-01)</div>
+                    <div className="kpi-card-value">
+                      {brandVsPerformance.performanceRatio !== null
+                        ? `${brandVsPerformance.performanceRatio.toFixed(2)}×`
+                        : '—'}
+                    </div>
+                    <div className="kpi-card-row">
+                      <span>Spend:</span>
+                      <span>{formatInr(brandVsPerformance.performanceSpend)}</span>
+                    </div>
+                  </div>
+                  <div className="kpi-card">
+                    <div className="kpi-card-name">Brand Marketing (INV-02)</div>
+                    <div className="kpi-card-value">
+                      {brandVsPerformance.brandRatio !== null
+                        ? `${brandVsPerformance.brandRatio.toFixed(2)}×`
+                        : '—'}
+                    </div>
+                    <div className="kpi-card-row">
+                      <span>Spend:</span>
+                      <span>{formatInr(brandVsPerformance.brandSpend)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <p className="table-note">
+                Both ratios are this selection's revenue against each branch's own spend, shown
+                separately rather than pooled into one Blended ROI — a dip in Marketing ROI on
+                Leadership traces to whichever of these two moved. Brand campaigns are expected to
+                look less efficient short-term than performance campaigns chasing the same
+                revenue, so pooling them hides that difference instead of showing it.
+              </p>
+
+              <h3>Retention Program Payback — Trailing Quarters</h3>
+              <p className="field-hint">Explains: KPI-03 Repeat Purchase Rate.</p>
+              {retentionTrend.length > 0 && (
+                <div className="trend-chart-card" style={{ maxWidth: 640 }}>
+                  <div className="trend-chart-title">Loyalty/Retention Spend (INV-05) vs. Repeat Purchase Revenue (RET-03.1)</div>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <LineChart data={retentionTrend}>
+                      <XAxis dataKey="quarter" tick={{ fontSize: 11 }} />
+                      <YAxis hide />
+                      <Tooltip formatter={(v) => formatInr(v)} />
+                      <Line type="monotone" dataKey="retentionSpend" name="Retention Spend" stroke="#7B4FA8" strokeWidth={2} dot={{ r: 3 }} />
+                      <Line type="monotone" dataKey="repeatRevenue" name="Repeat Purchase Revenue" stroke="#FF2E8B" strokeWidth={2} dot={{ r: 3 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+              <p className="table-note">
+                If retention spend is rising without a corresponding rise in repeat purchase
+                revenue here, that's usually why Repeat Purchase Rate on Leadership isn't moving —
+                the loyalty program is trending toward a cost center rather than paying back.
+              </p>
+
+              {isOfflineRetail && locationId && (
+                <>
+                  <h3>Offline Conversion Efficiency</h3>
+                  <p className="field-hint">Explains: KPI-01 Group Net Revenue Growth (Offline Retail).</p>
+                  {offlineConversion && (
+                    <div className="kpi-card-grid">
+                      <div className="kpi-card">
+                        <div className="kpi-card-name">Avg. In-Store Conversion Rate</div>
+                        <div className="kpi-card-value">
+                          {offlineConversion.avgConversionRate !== null
+                            ? `${offlineConversion.avgConversionRate.toFixed(1)}%`
+                            : '—'}
+                        </div>
+                      </div>
+                      <div className="kpi-card">
+                        <div className="kpi-card-name">Store Investment (Rent, Staff, Launch)</div>
+                        <div className="kpi-card-value">{formatInr(offlineConversion.storeInvestment)}</div>
+                      </div>
+                    </div>
+                  )}
+                  <p className="table-note">
+                    A store carrying high rent/staff investment (INV-06) without a matching
+                    conversion rate is a candidate for the Retail Ops Head to review — this is
+                    what a Location-grouped ratio on its own can't show, since it only prices
+                    spend against vertical-wide revenue, not against this store's own footfall
+                    turning into sales.
+                  </p>
+                </>
+              )}
+              {isOfflineRetail && !locationId && (
+                <p className="field-hint">Select a Location above to see Offline Conversion Efficiency for that store.</p>
+              )}
+
+              <h3>Brand Equity &amp; Organic Pull — Lead Indicator</h3>
+              <p className="field-hint">
+                Explains: KPI-01 Group Net Revenue Growth, ahead of time. Branded search volume,
+                direct/type-in traffic and organic app installs (RET-04), indexed to the earliest
+                quarter with data = 100. Unlike every other KPI on this screen, this is a lead
+                indicator — it is built to move before revenue does, not after.
+              </p>
+              {brandEquityTrend.some((p) => p.index !== null) && (
+                <div className="trend-chart-card" style={{ maxWidth: 640 }}>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <LineChart data={brandEquityTrend}>
+                      <XAxis dataKey="quarter" tick={{ fontSize: 11 }} />
+                      <YAxis hide />
+                      <Tooltip formatter={(v) => (v !== null ? v.toFixed(1) : '—')} />
+                      <Line type="monotone" dataKey="index" name="Brand Equity Index" stroke="#FF2E8B" strokeWidth={2} dot={{ r: 3 }} connectNulls />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+              {!brandEquityTrend.some((p) => p.index !== null) && (
+                <p>No RET-04 (Brand Equity) data recorded for this selection in the trailing quarters.</p>
+              )}
+            </>
+          )}
+
           <div className="attribution-note">
             Attributed Return is the vertical's total net revenue for this period, shown as a
             shared reference point against each category's spend — the system does not track
